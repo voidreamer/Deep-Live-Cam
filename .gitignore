@@ -6,22 +6,43 @@ __pycache__/
 .todo
 *.log
 *.backup
-tf_env/
+
+# Media files
 *.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
 *.mp4
 *.mkv
+*.avi
+*.mov
 
+# Temp / working dirs
 .tmp/
 temp/
+workflow/
+faceswap/
+
+# Virtual environments
 .venv/
 venv/
 env/
-workflow/
-gfpgan/
-models/inswapper_128.onnx
-models/GFPGANv1.4.pth
-*.onnx
-models/DMDNet.pth
-faceswap/
+tf_env/
+
+# Models (large binaries, download separately)
+models/*.onnx
+models/*.pth
+models/buffalo_l/
+
+# Editor / IDE
 .vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App state
 switch_states.json
+gfpgan/
