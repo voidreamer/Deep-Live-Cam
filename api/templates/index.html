@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep-Live-Cam</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: #0f0f0f; color: #e0e0e0; min-height: 100vh;
+         display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #fff; }
+  .container { width: 100%; max-width: 900px; }
+
+  /* Top bar */
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
+             padding: .5rem 0; border-bottom: 1px solid #222; }
+  .top-bar .brand { font-weight: 700; font-size: 1.1rem; color: #fff; }
+  .top-bar .actions { display: flex; gap: .75rem; align-items: center; }
+  .top-bar .tier-badge { font-size: .7rem; padding: .2rem .6rem; border-radius: 10px;
+                         text-transform: uppercase; font-weight: 600; }
+  .tier-free { background: #333; color: #888; }
+  .tier-premium { background: #4a9eff22; color: #4a9eff; border: 1px solid #4a9eff44; }
+  .quota-info { font-size: .75rem; color: #666; }
+  .btn-sm { font-size: .8rem; padding: .35rem .75rem; border-radius: 6px; cursor: pointer;
+            border: 1px solid #333; background: #1a1a1a; color: #ccc; text-decoration: none;
+            transition: all .2s; }
+  .btn-sm:hover { background: #2a2a2a; color: #fff; }
+  .btn-upgrade { background: #4a9eff; color: #fff; border-color: #4a9eff; }
+  .btn-upgrade:hover { background: #3a8eef; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 1rem; }
+  .tab { padding: .5rem 1.25rem; background: #1a1a1a; border: 1px solid #333; cursor: pointer;
+         font-size: .85rem; color: #888; transition: all .2s; }
+  .tab:first-child { border-radius: 8px 0 0 8px; }
+  .tab:last-child { border-radius: 0 8px 8px 0; }
+  .tab.active { background: #4a9eff; color: #fff; border-color: #4a9eff; }
+  .upload-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .upload-box { flex: 1; border: 2px dashed #333; border-radius: 12px; padding: 1rem;
+                text-align: center; cursor: pointer; transition: border-color .2s;
+                position: relative; overflow: hidden; min-height: 200px;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .upload-box:hover { border-color: #666; }
+  .upload-box.has-image { border-color: #4a9eff; }
+  .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-box img { max-width: 100%; max-height: 250px; border-radius: 8px; }
+  .upload-box .label { font-size: .85rem; color: #888; margin-top: .5rem; }
+  .upload-box .placeholder { color: #555; font-size: 2rem; margin-bottom: .25rem; }
+  .options { display: flex; gap: 1.5rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+  .options label { display: flex; align-items: center; gap: .4rem; font-size: .9rem; cursor: pointer; }
+  .options input[type=checkbox] { accent-color: #4a9eff; width: 16px; height: 16px; }
+  .premium-label { color: #4a9eff; font-size: .7rem; font-weight: 600; }
+  button { background: #4a9eff; color: #fff; border: none; border-radius: 8px;
+           padding: .75rem 2rem; font-size: 1rem; cursor: pointer; font-weight: 600;
+           transition: background .2s; }
+  button:hover { background: #3a8eef; }
+  button:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .result-area { margin-top: 1.5rem; text-align: center; }
+  .result-area img { max-width: 100%; border-radius: 12px; border: 1px solid #222; }
+  .error { color: #ff6b6b; margin-top: 1rem; font-size: .9rem; }
+  .spinner { display: none; margin: 1rem auto; width: 32px; height: 32px;
+             border: 3px solid #333; border-top-color: #4a9eff; border-radius: 50%;
+             animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { font-size: .75rem; color: #555; margin-top: 2rem; }
+  .download-btn { display: inline-block; margin-top: .75rem; background: #2a2a2a;
+                  color: #4a9eff; padding: .5rem 1.25rem; border-radius: 6px;
+                  text-decoration: none; font-size: .85rem; border: 1px solid #333; }
+  .download-btn:hover { background: #333; }
+  .progress-bar-wrap { width: 100%; background: #1a1a1a; border-radius: 8px; height: 24px;
+                       margin-top: .75rem; overflow: hidden; display: none; border: 1px solid #333; }
+  .progress-bar { height: 100%; background: #4a9eff; border-radius: 8px; transition: width .3s;
+                  display: flex; align-items: center; justify-content: center;
+                  font-size: .75rem; color: #fff; font-weight: 600; min-width: 2rem; }
+  .progress-text { font-size: .8rem; color: #888; margin-top: .4rem; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="top-bar">
+    <div class="brand">Deep-Live-Cam</div>
+    <div class="actions">
+      <span class="quota-info" id="quota-info"></span>
+      <span class="tier-badge tier-free hidden" id="tier-badge"></span>
+      <a href="/me/history" class="btn-sm hidden" id="history-btn">History</a>
+      <a href="/checkout" class="btn-sm btn-upgrade hidden" id="upgrade-btn">Upgrade</a>
+      <a href="/auth/google" class="btn-sm hidden" id="login-btn">Sign in with Google</a>
+      <a href="/auth/logout" class="btn-sm hidden" id="logout-btn">Logout</a>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-mode="image">Image</div>
+    <div class="tab" data-mode="video">Video</div>
+  </div>
+  <div class="upload-row">
+    <div class="upload-box" id="source-box">
+      <div class="placeholder">+</div>
+      <div class="label">Source face</div>
+      <input type="file" accept="image/*" id="source-input">
+    </div>
+    <div class="upload-box" id="target-box">
+      <div class="placeholder">+</div>
+      <div class="label" id="target-label">Target image</div>
+      <input type="file" accept="image/*" id="target-input">
+    </div>
+  </div>
+  <div class="options">
+    <label><input type="checkbox" id="many-faces"> Swap all faces</label>
+    <label id="enhance-label"><input type="checkbox" id="enhance"> Enhance <span class="premium-label" id="enhance-premium">(Premium)</span></label>
+    <button id="swap-btn" disabled>Swap</button>
+  </div>
+  <div class="spinner" id="spinner"></div>
+  <div class="progress-bar-wrap" id="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar">0%</div>
+  </div>
+  <div class="progress-text" id="progress-text"></div>
+  <div class="error" id="error"></div>
+  <div class="result-area" id="result-area"></div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const sourceInput = document.getElementById('source-input');
+const targetInput = document.getElementById('target-input');
+const sourceBox = document.getElementById('source-box');
+const targetBox = document.getElementById('target-box');
+const targetLabel = document.getElementById('target-label');
+const swapBtn = document.getElementById('swap-btn');
+const spinner = document.getElementById('spinner');
+const progressWrap = document.getElementById('progress-bar-wrap');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const errorEl = document.getElementById('error');
+const resultArea = document.getElementById('result-area');
+const statusEl = document.getElementById('status');
+let sourceFile = null, targetFile = null, mode = 'image';
+let currentUser = null;
+
+// --- Auth & UI State ---
+async function loadUserState() {
+  try {
+    const resp = await fetch('/me');
+    if (resp.ok) {
+      currentUser = await resp.json();
+      document.getElementById('login-btn').classList.add('hidden');
+      document.getElementById('logout-btn').classList.remove('hidden');
+      document.getElementById('history-btn').classList.remove('hidden');
+
+      const badge = document.getElementById('tier-badge');
+      badge.classList.remove('hidden', 'tier-free', 'tier-premium');
+      badge.classList.add(currentUser.tier === 'premium' ? 'tier-premium' : 'tier-free');
+      badge.textContent = currentUser.tier;
+
+      if (currentUser.tier === 'premium') {
+        document.getElementById('upgrade-btn').classList.add('hidden');
+        document.getElementById('enhance-premium').classList.add('hidden');
+      } else {
+        document.getElementById('upgrade-btn').classList.remove('hidden');
+      }
+
+      // Load usage
+      const usageResp = await fetch('/me/usage');
+      if (usageResp.ok) {
+        const usage = await usageResp.json();
+        const qi = document.getElementById('quota-info');
+        if (usage.today.image_limit === -1) {
+          qi.textContent = 'Unlimited swaps';
+        } else {
+          qi.textContent = `Images: ${usage.today.image_swaps}/${usage.today.image_limit} | Videos: ${usage.today.video_swaps}/${usage.today.video_limit}`;
+        }
+      }
+    } else {
+      // Not logged in — show login if auth is configured
+      const authCheck = await fetch('/auth/google', { method: 'HEAD', redirect: 'manual' });
+      if (authCheck.status !== 404) {
+        document.getElementById('login-btn').classList.remove('hidden');
+      }
+    }
+  } catch (e) {
+    // Auth not configured, that's fine
+  }
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    mode = tab.dataset.mode;
+    targetLabel.textContent = mode === 'video' ? 'Target video' : 'Target image';
+    targetInput.accept = mode === 'video' ? 'video/*' : 'image/*';
+    targetFile = null;
+    const existingMedia = targetBox.querySelector('img, video');
+    if (existingMedia) existingMedia.remove();
+    const ph = targetBox.querySelector('.placeholder');
+    if (!ph) { const d = document.createElement('div'); d.className='placeholder'; d.textContent='+'; targetBox.insertBefore(d, targetBox.firstChild); }
+    targetBox.classList.remove('has-image');
+    targetInput.value = '';
+    updateBtn();
+  });
+});
+
+function preview(input, box, isVideo) {
+  const file = input.files[0];
+  if (!file) return null;
+  const existingMedia = box.querySelector('img, video');
+  const placeholder = box.querySelector('.placeholder');
+  const label = box.querySelector('.label');
+  if (existingMedia) existingMedia.remove();
+  if (placeholder) placeholder.remove();
+  if (isVideo) {
+    const vid = document.createElement('video');
+    vid.src = URL.createObjectURL(file);
+    vid.style.maxWidth = '100%'; vid.style.maxHeight = '250px'; vid.style.borderRadius = '8px';
+    vid.muted = true; vid.loop = true; vid.autoplay = true;
+    box.insertBefore(vid, box.firstChild);
+  } else {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    box.insertBefore(img, box.firstChild);
+  }
+  if (label) label.textContent = file.name;
+  box.classList.add('has-image');
+  return file;
+}
+
+sourceInput.addEventListener('change', () => { sourceFile = preview(sourceInput, sourceBox, false); updateBtn(); });
+targetInput.addEventListener('change', () => { targetFile = preview(targetInput, targetBox, mode === 'video'); updateBtn(); });
+function updateBtn() { swapBtn.disabled = !(sourceFile && targetFile); }
+
+function resetUI() {
+  spinner.style.display = 'none';
+  progressWrap.style.display = 'none';
+  progressText.textContent = '';
+  progressBar.style.width = '0%';
+  progressBar.textContent = '0%';
+  updateBtn();
+}
+
+// --- Image swap (direct) ---
+async function doImageSwap(params, fd) {
+  spinner.style.display = 'block';
+  const resp = await fetch('/swap?' + params.toString(), { method: 'POST', body: fd });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(err.detail || 'Swap failed');
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const img = document.createElement('img'); img.src = url;
+  resultArea.appendChild(img);
+  const dl = document.createElement('a');
+  dl.href = url; dl.download = 'result.jpg'; dl.className = 'download-btn'; dl.textContent = 'Download';
+  resultArea.appendChild(dl);
+}
+
+// --- Video swap (job-based with progress) ---
+async function doVideoSwap(params, fd) {
+  progressText.textContent = 'Uploading video...';
+  spinner.style.display = 'block';
+  const submitResp = await fetch('/swap/video?' + params.toString(), { method: 'POST', body: fd });
+  if (!submitResp.ok) {
+    const err = await submitResp.json().catch(() => ({ detail: submitResp.statusText }));
+    throw new Error(err.detail || 'Failed to submit video job');
+  }
+  const { job_id } = await submitResp.json();
+  spinner.style.display = 'none';
+  progressWrap.style.display = 'block';
+  progressText.textContent = 'Processing frames...';
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 1000));
+    const pollResp = await fetch('/job/' + job_id);
+    if (!pollResp.ok) throw new Error('Failed to check job status');
+    const job = await pollResp.json();
+
+    if (job.status === 'processing') {
+      const pct = job.total_frames > 0 ? Math.round((job.processed_frames / job.total_frames) * 100) : 0;
+      progressBar.style.width = pct + '%';
+      progressBar.textContent = pct + '%';
+      progressText.textContent = 'Frame ' + job.processed_frames + ' / ' + job.total_frames;
+    } else if (job.status === 'done') {
+      progressBar.style.width = '100%';
+      progressBar.textContent = '100%';
+      progressText.textContent = 'Done! Downloading result...';
+      const dlResp = await fetch('/job/' + job_id + '/download');
+      if (!dlResp.ok) throw new Error('Failed to download result');
+      const blob = await dlResp.blob();
+      const url = URL.createObjectURL(blob);
+      const vid = document.createElement('video');
+      vid.src = url; vid.controls = true; vid.autoplay = true;
+      vid.style.maxWidth = '100%'; vid.style.borderRadius = '12px'; vid.style.border = '1px solid #222';
+      resultArea.appendChild(vid);
+      const dl = document.createElement('a');
+      dl.href = url; dl.download = 'result.mp4'; dl.className = 'download-btn'; dl.textContent = 'Download MP4';
+      resultArea.appendChild(dl);
+      break;
+    } else if (job.status === 'failed') {
+      throw new Error(job.error || 'Video processing failed');
+    }
+  }
+}
+
+swapBtn.addEventListener('click', async () => {
+  errorEl.textContent = '';
+  resultArea.innerHTML = '';
+  resetUI();
+  swapBtn.disabled = true;
+
+  const params = new URLSearchParams();
+  if (document.getElementById('many-faces').checked) params.set('many_faces', 'true');
+  if (document.getElementById('enhance').checked) params.set('enhance', 'true');
+  const fd = new FormData();
+  fd.append('source', sourceFile);
+  fd.append('target', targetFile);
+
+  try {
+    if (mode === 'video') {
+      await doVideoSwap(params, fd);
+    } else {
+      await doImageSwap(params, fd);
+    }
+  } catch (e) {
+    errorEl.textContent = e.message;
+  } finally {
+    resetUI();
+    loadUserState(); // refresh quota display
+  }
+});
+
+fetch('/health').then(r => r.json()).then(d => {
+  const s = d.status === 'ok' ? 'All models loaded' : 'Degraded -- check /health for details';
+  statusEl.textContent = s + ' | ' + d.execution_providers.join(', ');
+}).catch(() => { statusEl.textContent = 'Could not reach API'; });
+
+// Load auth state on page load
+loadUserState();
+</script>
+</body>
+</html>

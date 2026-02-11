@@ -46,3 +46,7 @@ Thumbs.db
 # App state
 switch_states.json
 gfpgan/
+
+# SaaS data (DB + results)
+data/
+.env

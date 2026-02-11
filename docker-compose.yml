@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models      # mount models (not baked into image)
+      - ./data:/app/data           # persist DB + results
+    env_file: .env
+    restart: unless-stopped
